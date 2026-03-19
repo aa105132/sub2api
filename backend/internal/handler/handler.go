@@ -45,6 +45,7 @@ type Handlers struct {
 	OpenAIGateway *OpenAIGatewayHandler
 	SoraGateway   *SoraGatewayHandler
 	SoraClient    *SoraClientHandler
+	ExternalCodex *ExternalCodexHandler
 	Setting       *SettingHandler
 	Totp          *TotpHandler
 }

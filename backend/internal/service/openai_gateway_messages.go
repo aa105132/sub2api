@@ -166,10 +166,13 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 			if s.rateLimitService != nil {
 				s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
 			}
+			s.handleCodexCredentialFailure(ctx, account, resp.StatusCode, respBody)
 			return nil, &UpstreamFailoverError{
-				StatusCode:             resp.StatusCode,
-				ResponseBody:           respBody,
-				RetryableOnSameAccount: account.IsPoolMode() && (isPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
+				StatusCode:   resp.StatusCode,
+				ResponseBody: respBody,
+				RetryableOnSameAccount: account.IsPoolMode() &&
+					!s.shouldAutoDeleteCodexCredential(account, resp.StatusCode) &&
+					(isPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
 			}
 		}
 		// Non-failover error: return Anthropic-formatted error to client

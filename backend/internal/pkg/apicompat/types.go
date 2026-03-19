@@ -24,6 +24,7 @@ type AnthropicRequest struct {
 	Thinking     *AnthropicThinking     `json:"thinking,omitempty"`
 	ToolChoice   json.RawMessage        `json:"tool_choice,omitempty"`
 	OutputConfig *AnthropicOutputConfig `json:"output_config,omitempty"`
+	Metadata     *AnthropicMetadata     `json:"metadata,omitempty"`
 }
 
 // AnthropicOutputConfig controls output generation parameters.
@@ -35,6 +36,11 @@ type AnthropicOutputConfig struct {
 type AnthropicThinking struct {
 	Type         string `json:"type"`                    // "enabled" | "adaptive" | "disabled"
 	BudgetTokens int    `json:"budget_tokens,omitempty"` // max thinking tokens
+}
+
+// AnthropicMetadata stores request-level metadata for compatibility routing.
+type AnthropicMetadata struct {
+	UserID string `json:"user_id,omitempty"`
 }
 
 // AnthropicMessage is a single message in the Anthropic conversation.
@@ -69,9 +75,10 @@ type AnthropicContentBlock struct {
 
 // AnthropicImageSource describes the source data for an image content block.
 type AnthropicImageSource struct {
-	Type      string `json:"type"` // "base64"
-	MediaType string `json:"media_type"`
-	Data      string `json:"data"`
+	Type      string `json:"type"` // "base64" | "url"
+	MediaType string `json:"media_type,omitempty"`
+	Data      string `json:"data,omitempty"`
+	URL       string `json:"url,omitempty"`
 }
 
 // AnthropicTool describes a tool available to the model.

@@ -316,6 +316,7 @@ type OpenAIGatewayService struct {
 	billingService        *BillingService
 	rateLimitService      *RateLimitService
 	billingCacheService   *BillingCacheService
+	teamService           *OpenAIChatGPTTeamService
 	userGroupRateResolver *userGroupRateResolver
 	httpUpstream          HTTPUpstream
 	deferredService       *DeferredService
@@ -354,6 +355,7 @@ func NewOpenAIGatewayService(
 	billingService *BillingService,
 	rateLimitService *RateLimitService,
 	billingCacheService *BillingCacheService,
+	teamService *OpenAIChatGPTTeamService,
 	httpUpstream HTTPUpstream,
 	deferredService *DeferredService,
 	openAITokenProvider *OpenAITokenProvider,
@@ -372,6 +374,7 @@ func NewOpenAIGatewayService(
 		billingService:      billingService,
 		rateLimitService:    rateLimitService,
 		billingCacheService: billingCacheService,
+		teamService:         teamService,
 		userGroupRateResolver: newUserGroupRateResolver(
 			userGroupRateRepo,
 			nil,
@@ -1637,8 +1640,14 @@ func (s *OpenAIGatewayService) shouldFailoverOpenAIUpstreamResponse(statusCode i
 }
 
 func (s *OpenAIGatewayService) handleFailoverSideEffects(ctx context.Context, resp *http.Response, account *Account) {
+	if s == nil || resp == nil || account == nil {
+		return
+	}
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
-	s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, body)
+	if s.rateLimitService != nil {
+		s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, body)
+	}
+	s.handleCodexCredentialFailure(ctx, account, resp.StatusCode, body)
 }
 
 // Forward forwards request to OpenAI API
@@ -2223,9 +2232,11 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 
 				s.handleFailoverSideEffects(ctx, resp, account)
 				return nil, &UpstreamFailoverError{
-					StatusCode:             resp.StatusCode,
-					ResponseBody:           respBody,
-					RetryableOnSameAccount: account.IsPoolMode() && (isPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
+					StatusCode:   resp.StatusCode,
+					ResponseBody: respBody,
+					RetryableOnSameAccount: account.IsPoolMode() &&
+						!s.shouldAutoDeleteCodexCredential(account, resp.StatusCode) &&
+						(isPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
 				}
 			}
 			return s.handleErrorResponse(ctx, resp, c, account, body)
@@ -2610,6 +2621,7 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 		Detail:               upstreamDetail,
 		UpstreamResponseBody: upstreamDetail,
 	})
+	s.handleCodexCredentialFailure(ctx, account, resp.StatusCode, body)
 
 	writeOpenAIPassthroughResponseHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 	contentType := resp.Header.Get("Content-Type")
@@ -3046,6 +3058,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	if s.rateLimitService != nil {
 		shouldDisable = s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, body)
 	}
+	s.handleCodexCredentialFailure(ctx, account, resp.StatusCode, body)
 	kind := "http_error"
 	if shouldDisable {
 		kind = "failover"
@@ -3062,9 +3075,11 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	})
 	if shouldDisable {
 		return nil, &UpstreamFailoverError{
-			StatusCode:             resp.StatusCode,
-			ResponseBody:           body,
-			RetryableOnSameAccount: account.IsPoolMode() && isPoolModeRetryableStatus(resp.StatusCode),
+			StatusCode:   resp.StatusCode,
+			ResponseBody: body,
+			RetryableOnSameAccount: account.IsPoolMode() &&
+				!s.shouldAutoDeleteCodexCredential(account, resp.StatusCode) &&
+				isPoolModeRetryableStatus(resp.StatusCode),
 		}
 	}
 
@@ -3183,6 +3198,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 			c.Request.Context(), account, resp.StatusCode, resp.Header, body,
 		)
 	}
+	s.handleCodexCredentialFailure(c.Request.Context(), account, resp.StatusCode, body)
 	kind := "http_error"
 	if shouldDisable {
 		kind = "failover"
@@ -3199,9 +3215,11 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 	})
 	if shouldDisable {
 		return nil, &UpstreamFailoverError{
-			StatusCode:             resp.StatusCode,
-			ResponseBody:           body,
-			RetryableOnSameAccount: account.IsPoolMode() && isPoolModeRetryableStatus(resp.StatusCode),
+			StatusCode:   resp.StatusCode,
+			ResponseBody: body,
+			RetryableOnSameAccount: account.IsPoolMode() &&
+				!s.shouldAutoDeleteCodexCredential(account, resp.StatusCode) &&
+				isPoolModeRetryableStatus(resp.StatusCode),
 		}
 	}
 
