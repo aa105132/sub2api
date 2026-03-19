@@ -123,6 +123,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAdminSettingsStore } from '@/stores/adminSettings'
 import ModelIcon from '@/components/common/ModelIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { allModels, getModelsByPlatform } from '@/composables/useModelWhitelist'
@@ -133,6 +134,8 @@ const props = defineProps<{
   modelValue: string[]
   platform?: string
   platforms?: string[]
+  baseUrl?: string
+  baseUrls?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -140,6 +143,8 @@ const emit = defineEmits<{
 }>()
 
 const appStore = useAppStore()
+const adminSettingsStore = useAdminSettingsStore()
+void adminSettingsStore.fetch()
 
 const showDropdown = ref(false)
 const searchQuery = ref('')
@@ -162,19 +167,125 @@ const normalizedPlatforms = computed(() => {
   )
 })
 
-const availableOptions = computed(() => {
-  if (normalizedPlatforms.value.length === 0) {
-    return allModels
+const normalizedBaseUrls = computed(() => {
+  const rawBaseUrls =
+    props.baseUrls && props.baseUrls.length > 0
+      ? props.baseUrls
+      : props.baseUrl
+        ? [props.baseUrl]
+        : []
+
+  return Array.from(
+    new Set(
+      rawBaseUrls
+        .map(baseUrl => normalizeCustomEndpointBaseUrl(baseUrl))
+        .filter((baseUrl): baseUrl is string => Boolean(baseUrl))
+    )
+  )
+})
+
+function normalizeCustomEndpointPlatform(platform?: string): string {
+  switch ((platform || '').trim().toLowerCase()) {
+    case 'claude':
+    case 'anthropic':
+      return 'anthropic'
+    case 'openai':
+      return 'openai'
+    case 'gemini':
+      return 'gemini'
+    case 'antigravity':
+      return 'antigravity'
+    case 'sora':
+      return 'sora'
+    default:
+      return ''
+  }
+}
+
+function normalizeCustomEndpointBaseUrl(raw?: string | null): string {
+  const value = raw?.trim()
+  if (!value) {
+    return ''
+  }
+  try {
+    const parsed = new URL(value)
+    const pathname = parsed.pathname.replace(/\/+$/, '')
+    return `${parsed.protocol.toLowerCase()}//${parsed.host.toLowerCase()}${pathname === '/' ? '' : pathname}`
+  } catch {
+    return ''
+  }
+}
+
+function dedupeModels(models: string[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const model of models) {
+    const normalized = model.trim()
+    if (!normalized || seen.has(normalized)) {
+      continue
+    }
+    seen.add(normalized)
+    result.push(normalized)
+  }
+  return result
+}
+
+function getCustomEndpointModelsForPlatform(platform: string): string[] {
+  const normalizedPlatform = normalizeCustomEndpointPlatform(platform)
+  if (!normalizedPlatform || normalizedBaseUrls.value.length === 0) {
+    return []
   }
 
-  const allowedModels = new Set<string>()
-  for (const platform of normalizedPlatforms.value) {
-    for (const model of getModelsByPlatform(platform)) {
-      allowedModels.add(model)
+  const matchedModels: string[] = []
+  for (const item of adminSettingsStore.customEndpointModels) {
+    if (normalizeCustomEndpointPlatform(item.platform) !== normalizedPlatform) {
+      continue
+    }
+    if (!normalizedBaseUrls.value.includes(normalizeCustomEndpointBaseUrl(item.base_url))) {
+      continue
+    }
+    if (Array.isArray(item.models)) {
+      matchedModels.push(...item.models)
     }
   }
+  return dedupeModels(matchedModels)
+}
 
-  return allModels.filter(model => allowedModels.has(model.value))
+function getMergedModelsForPlatform(platform: string): string[] {
+  return dedupeModels([
+    ...getCustomEndpointModelsForPlatform(platform),
+    ...getModelsByPlatform(platform)
+  ])
+}
+
+function toOptions(models: string[]) {
+  return models.map(model => ({ value: model, label: model }))
+}
+
+const availableOptions = computed(() => {
+  if (normalizedPlatforms.value.length === 0) {
+    const customModels = dedupeModels(
+      adminSettingsStore.customEndpointModels
+        .filter((item) => {
+          if (normalizedBaseUrls.value.length === 0) {
+            return true
+          }
+          return normalizedBaseUrls.value.includes(normalizeCustomEndpointBaseUrl(item.base_url))
+        })
+        .flatMap(item => Array.isArray(item.models) ? item.models : [])
+    )
+    return toOptions(dedupeModels([
+      ...customModels,
+      ...allModels.map(model => model.value)
+    ]))
+  }
+
+  const allowedModels: string[] = []
+  for (const platform of normalizedPlatforms.value) {
+    allowedModels.push(...getMergedModelsForPlatform(platform))
+  }
+
+  return toOptions(dedupeModels(allowedModels))
 })
 
 const filteredModels = computed(() => {
@@ -220,7 +331,7 @@ const handleEnter = () => {
 const fillRelated = () => {
   const newModels = [...props.modelValue]
   for (const platform of normalizedPlatforms.value) {
-    for (const model of getModelsByPlatform(platform)) {
+    for (const model of getMergedModelsForPlatform(platform)) {
       if (!newModels.includes(model)) {
         newModels.push(model)
       }

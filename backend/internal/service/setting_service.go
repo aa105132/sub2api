@@ -397,6 +397,14 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 		normalizedWhitelist = []string{}
 	}
 	settings.RegistrationEmailSuffixWhitelist = normalizedWhitelist
+	normalizedCustomEndpointModels, err := normalizeCustomEndpointModelSettings(settings.CustomEndpointModels)
+	if err != nil {
+		return infraerrors.BadRequest("INVALID_CUSTOM_ENDPOINT_MODELS", err.Error())
+	}
+	if normalizedCustomEndpointModels == nil {
+		normalizedCustomEndpointModels = []CustomEndpointModelSetting{}
+	}
+	settings.CustomEndpointModels = normalizedCustomEndpointModels
 
 	updates := make(map[string]string)
 
@@ -453,6 +461,11 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyPurchaseSubscriptionURL] = strings.TrimSpace(settings.PurchaseSubscriptionURL)
 	updates[SettingKeySoraClientEnabled] = strconv.FormatBool(settings.SoraClientEnabled)
 	updates[SettingKeyCustomMenuItems] = settings.CustomMenuItems
+	customEndpointModelsJSON, err := json.Marshal(settings.CustomEndpointModels)
+	if err != nil {
+		return fmt.Errorf("marshal custom endpoint models: %w", err)
+	}
+	updates[SettingKeyCustomEndpointModels] = string(customEndpointModelsJSON)
 
 	// 默认配置
 	updates[SettingKeyDefaultConcurrency] = strconv.Itoa(settings.DefaultConcurrency)
@@ -737,6 +750,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyPurchaseSubscriptionURL:          "",
 		SettingKeySoraClientEnabled:                "false",
 		SettingKeyCustomMenuItems:                  "[]",
+		SettingKeyCustomEndpointModels:             "[]",
 		SettingKeyDefaultConcurrency:               strconv.Itoa(s.cfg.Default.UserConcurrency),
 		SettingKeyDefaultBalance:                   strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
 		SettingKeyDefaultSubscriptions:             "[]",
@@ -801,6 +815,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		PurchaseSubscriptionURL:          strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
 		SoraClientEnabled:                settings[SettingKeySoraClientEnabled] == "true",
 		CustomMenuItems:                  settings[SettingKeyCustomMenuItems],
+		CustomEndpointModels:             parseCustomEndpointModelSettings(settings[SettingKeyCustomEndpointModels]),
 		BackendModeEnabled:               settings[SettingKeyBackendModeEnabled] == "true",
 	}
 

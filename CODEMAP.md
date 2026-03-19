@@ -197,3 +197,51 @@
 - `CODEMAP.md`
   - 本次改动：初始化仓库代码地图，先覆盖启动装配、路由、Codex 外部接口、兼容层、OpenAI 网关与相关测试。
   - 后续维护：继续按模块增量追加，不需要一次写完整个仓库。
+
+- `backend/internal/service/setting_custom_endpoint_models.go`
+  - 入口：`GetCustomEndpointModelSettings`、`GetCustomEndpointModelsForAccount`
+  - 作用：维护 `custom_endpoint_models` 设置项的解析、归一化、按 `platform + base_url` 匹配。
+  - 本次改动：新增自定义端点模型设置的数据结构、URL 规范化与匹配逻辑。
+  - 关联：`backend/internal/service/setting_service.go`、`backend/internal/handler/admin/setting_handler.go`
+
+- `backend/internal/service/setting_service.go`
+  - 入口：`UpdateSettings`、`InitializeDefaultSettings`、`parseSettings`
+  - 作用：系统设置统一读写入口。
+  - 本次改动：把 `custom_endpoint_models` 纳入默认值、后台保存、后台读取。
+  - 关联：`backend/internal/service/settings_view.go`、`backend/internal/handler/dto/settings.go`
+
+- `backend/internal/handler/admin/setting_handler.go`
+  - 入口：`GetSettings`、`UpdateSettings`
+  - 作用：管理员系统设置接口。
+  - 本次改动：支持返回 / 保存 `custom_endpoint_models`，并增加 DTO 与 service 互转 helper。
+  - 关联：`backend/internal/service/setting_custom_endpoint_models.go`、`frontend/src/views/admin/SettingsView.vue`
+
+- `backend/internal/handler/admin/account_handler.go`
+  - 入口：`GetAvailableModels`
+  - 作用：管理员侧账号模型列表接口。
+  - 本次改动：当账号未配置 `model_mapping` 时，优先按账号 `platform + base_url` 读取自定义端点模型并生成平台对应的模型列表对象。
+  - 关联：`backend/internal/service/setting_custom_endpoint_models.go`、`backend/cmd/server/wire_gen.go`
+
+- `backend/internal/service/gateway_service.go`
+  - 入口：`GetAvailableModels`
+  - 作用：网关 `/v1/models` 的聚合模型列表来源。
+  - 本次改动：除 `model_mapping` 外，也会聚合匹配到的自定义端点模型，并进入短 TTL 缓存。
+  - 关联：`backend/internal/service/gateway_hotpath_optimization_test.go`
+
+- `frontend/src/views/admin/SettingsView.vue`
+  - 入口：`loadSettings`、`saveSettings`
+  - 作用：管理员系统设置页。
+  - 本次改动：新增“自定义端点模型”编辑区，使用 JSON 文本框维护 `custom_endpoint_models`。
+  - 关联：`frontend/src/api/admin/settings.ts`、`frontend/src/stores/adminSettings.ts`
+
+- `frontend/src/stores/adminSettings.ts`
+  - 入口：`useAdminSettingsStore`
+  - 作用：缓存管理员设置，供导航 / 模型选择器等前端组件复用。
+  - 本次改动：缓存 `custom_endpoint_models`，供模型白名单选择器动态读取。
+  - 关联：`frontend/src/components/account/ModelWhitelistSelector.vue`
+
+- `frontend/src/components/account/ModelWhitelistSelector.vue`
+  - 入口：模型白名单多选组件
+  - 作用：账号创建 / 编辑 / 批量编辑时选择允许模型。
+  - 本次改动：支持传入 `baseUrl` / `baseUrls`，会把匹配 `platform + base_url` 的自定义端点模型合并进候选列表。
+  - 关联：`frontend/src/components/account/CreateAccountModal.vue`、`frontend/src/components/account/EditAccountModal.vue`、`frontend/src/components/account/BulkEditAccountModal.vue`

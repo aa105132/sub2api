@@ -194,6 +194,59 @@ func TestSettingService_UpdateSettings_RegistrationEmailSuffixWhitelist_Invalid(
 	require.Equal(t, "INVALID_REGISTRATION_EMAIL_SUFFIX_WHITELIST", infraerrors.Reason(err))
 }
 
+func TestSettingService_UpdateSettings_CustomEndpointModels_Normalized(t *testing.T) {
+	repo := &settingUpdateRepoStub{}
+	svc := NewSettingService(repo, &config.Config{})
+
+	err := svc.UpdateSettings(context.Background(), &SystemSettings{
+		CustomEndpointModels: []CustomEndpointModelSetting{
+			{
+				ID:       " openai-local ",
+				Name:     " OpenAI Local ",
+				Platform: "OpenAI",
+				BaseURL:  "HTTPS://Example.COM/v1/",
+				Models:   []string{"gpt-5.1", "gpt-5.1", " gpt-5.1-codex "},
+			},
+			{},
+		},
+	})
+	require.NoError(t, err)
+
+	raw, ok := repo.updates[SettingKeyCustomEndpointModels]
+	require.True(t, ok)
+
+	var got []CustomEndpointModelSetting
+	require.NoError(t, json.Unmarshal([]byte(raw), &got))
+	require.Equal(t, []CustomEndpointModelSetting{
+		{
+			ID:       "openai-local",
+			Name:     "OpenAI Local",
+			Platform: PlatformOpenAI,
+			BaseURL:  "https://example.com/v1",
+			Models:   []string{"gpt-5.1", "gpt-5.1-codex"},
+		},
+	}, got)
+}
+
+func TestSettingService_UpdateSettings_CustomEndpointModels_Invalid(t *testing.T) {
+	repo := &settingUpdateRepoStub{}
+	svc := NewSettingService(repo, &config.Config{})
+
+	err := svc.UpdateSettings(context.Background(), &SystemSettings{
+		CustomEndpointModels: []CustomEndpointModelSetting{
+			{
+				ID:       "bad-endpoint",
+				Platform: "openai",
+				BaseURL:  "not-a-url",
+				Models:   []string{"gpt-5.1"},
+			},
+		},
+	})
+	require.Error(t, err)
+	require.Equal(t, "INVALID_CUSTOM_ENDPOINT_MODELS", infraerrors.Reason(err))
+	require.Nil(t, repo.updates)
+}
+
 func TestParseDefaultSubscriptions_NormalizesValues(t *testing.T) {
 	got := parseDefaultSubscriptions(`[{"group_id":11,"validity_days":30},{"group_id":11,"validity_days":60},{"group_id":0,"validity_days":10},{"group_id":12,"validity_days":99999}]`)
 	require.Equal(t, []DefaultSubscriptionSetting{

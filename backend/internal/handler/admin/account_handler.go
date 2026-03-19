@@ -49,6 +49,7 @@ type AccountHandler struct {
 	openaiOAuthService      *service.OpenAIOAuthService
 	geminiOAuthService      *service.GeminiOAuthService
 	antigravityOAuthService *service.AntigravityOAuthService
+	settingService          *service.SettingService
 	rateLimitService        *service.RateLimitService
 	accountUsageService     *service.AccountUsageService
 	accountTestService      *service.AccountTestService
@@ -66,6 +67,7 @@ func NewAccountHandler(
 	openaiOAuthService *service.OpenAIOAuthService,
 	geminiOAuthService *service.GeminiOAuthService,
 	antigravityOAuthService *service.AntigravityOAuthService,
+	settingService *service.SettingService,
 	rateLimitService *service.RateLimitService,
 	accountUsageService *service.AccountUsageService,
 	accountTestService *service.AccountTestService,
@@ -81,6 +83,7 @@ func NewAccountHandler(
 		openaiOAuthService:      openaiOAuthService,
 		geminiOAuthService:      geminiOAuthService,
 		antigravityOAuthService: antigravityOAuthService,
+		settingService:          settingService,
 		rateLimitService:        rateLimitService,
 		accountUsageService:     accountUsageService,
 		accountTestService:      accountTestService,
@@ -1726,6 +1729,10 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 
 		mapping := account.GetModelMapping()
 		if len(mapping) == 0 {
+			if models := h.getCustomEndpointModelsForAccount(c.Request.Context(), account); len(models) > 0 {
+				response.Success(c, buildOpenAIModels(models))
+				return
+			}
 			response.Success(c, openai.DefaultModels)
 			return
 		}
@@ -1758,6 +1765,10 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 	if account.IsGemini() {
 		// For OAuth accounts: return default Gemini models
 		if account.IsOAuth() {
+			if models := h.getCustomEndpointModelsForAccount(c.Request.Context(), account); len(models) > 0 {
+				response.Success(c, buildGeminiModels(models))
+				return
+			}
 			response.Success(c, geminicli.DefaultModels)
 			return
 		}
@@ -1765,6 +1776,10 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		// For API Key accounts: return models based on model_mapping
 		mapping := account.GetModelMapping()
 		if len(mapping) == 0 {
+			if models := h.getCustomEndpointModelsForAccount(c.Request.Context(), account); len(models) > 0 {
+				response.Success(c, buildGeminiModels(models))
+				return
+			}
 			response.Success(c, geminicli.DefaultModels)
 			return
 		}
@@ -1794,6 +1809,12 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 
 	// Handle Antigravity accounts: return Claude + Gemini models
 	if account.Platform == service.PlatformAntigravity {
+		if len(account.GetModelMapping()) == 0 {
+			if models := h.getCustomEndpointModelsForAccount(c.Request.Context(), account); len(models) > 0 {
+				response.Success(c, buildAntigravityModels(models))
+				return
+			}
+		}
 		// 直接复用 antigravity.DefaultModels()，与 /v1/models 端点保持同步
 		response.Success(c, antigravity.DefaultModels())
 		return
@@ -1801,6 +1822,12 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 
 	// Handle Sora accounts
 	if account.Platform == service.PlatformSora {
+		if len(account.GetModelMapping()) == 0 {
+			if models := h.getCustomEndpointModelsForAccount(c.Request.Context(), account); len(models) > 0 {
+				response.Success(c, buildSoraModels(models))
+				return
+			}
+		}
 		response.Success(c, service.DefaultSoraModels(nil))
 		return
 	}
@@ -1808,6 +1835,10 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 	// Handle Claude/Anthropic accounts
 	// For OAuth and Setup-Token accounts: return default models
 	if account.IsOAuth() {
+		if models := h.getCustomEndpointModelsForAccount(c.Request.Context(), account); len(models) > 0 {
+			response.Success(c, buildClaudeModels(models))
+			return
+		}
 		response.Success(c, claude.DefaultModels)
 		return
 	}
@@ -1815,6 +1846,10 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 	// For API Key accounts: return models based on model_mapping
 	mapping := account.GetModelMapping()
 	if len(mapping) == 0 {
+		if models := h.getCustomEndpointModelsForAccount(c.Request.Context(), account); len(models) > 0 {
+			response.Success(c, buildClaudeModels(models))
+			return
+		}
 		// No mapping configured, return default models
 		response.Success(c, claude.DefaultModels)
 		return
@@ -1844,6 +1879,120 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 	}
 
 	response.Success(c, models)
+}
+
+func (h *AccountHandler) getCustomEndpointModelsForAccount(ctx context.Context, account *service.Account) []string {
+	if h == nil || h.settingService == nil || account == nil {
+		return nil
+	}
+	return h.settingService.GetCustomEndpointModelsForAccount(ctx, account)
+}
+
+func buildOpenAIModels(modelIDs []string) []openai.Model {
+	defaults := make(map[string]openai.Model, len(openai.DefaultModels))
+	for _, model := range openai.DefaultModels {
+		defaults[model.ID] = model
+	}
+	models := make([]openai.Model, 0, len(modelIDs))
+	for _, modelID := range modelIDs {
+		if model, ok := defaults[modelID]; ok {
+			models = append(models, model)
+			continue
+		}
+		models = append(models, openai.Model{
+			ID:          modelID,
+			Object:      "model",
+			OwnedBy:     "openai",
+			Type:        "model",
+			DisplayName: modelID,
+		})
+	}
+	return models
+}
+
+func buildGeminiModels(modelIDs []string) []geminicli.Model {
+	defaults := make(map[string]geminicli.Model, len(geminicli.DefaultModels))
+	for _, model := range geminicli.DefaultModels {
+		defaults[model.ID] = model
+	}
+	models := make([]geminicli.Model, 0, len(modelIDs))
+	for _, modelID := range modelIDs {
+		if model, ok := defaults[modelID]; ok {
+			models = append(models, model)
+			continue
+		}
+		models = append(models, geminicli.Model{
+			ID:          modelID,
+			Type:        "model",
+			DisplayName: modelID,
+			CreatedAt:   "",
+		})
+	}
+	return models
+}
+
+func buildClaudeModels(modelIDs []string) []claude.Model {
+	defaults := make(map[string]claude.Model, len(claude.DefaultModels))
+	for _, model := range claude.DefaultModels {
+		defaults[model.ID] = model
+	}
+	models := make([]claude.Model, 0, len(modelIDs))
+	for _, modelID := range modelIDs {
+		if model, ok := defaults[modelID]; ok {
+			models = append(models, model)
+			continue
+		}
+		models = append(models, claude.Model{
+			ID:          modelID,
+			Type:        "model",
+			DisplayName: modelID,
+			CreatedAt:   "",
+		})
+	}
+	return models
+}
+
+func buildAntigravityModels(modelIDs []string) []antigravity.ClaudeModel {
+	defaults := make(map[string]antigravity.ClaudeModel)
+	for _, model := range antigravity.DefaultModels() {
+		defaults[model.ID] = model
+	}
+	models := make([]antigravity.ClaudeModel, 0, len(modelIDs))
+	for _, modelID := range modelIDs {
+		if model, ok := defaults[modelID]; ok {
+			models = append(models, model)
+			continue
+		}
+		models = append(models, antigravity.ClaudeModel{
+			ID:          modelID,
+			Type:        "model",
+			DisplayName: modelID,
+			CreatedAt:   "",
+		})
+	}
+	return models
+}
+
+func buildSoraModels(modelIDs []string) []openai.Model {
+	defaults := make(map[string]openai.Model)
+	for _, model := range service.DefaultSoraModels(nil) {
+		defaults[model.ID] = model
+	}
+	models := make([]openai.Model, 0, len(modelIDs))
+	for _, modelID := range modelIDs {
+		if model, ok := defaults[modelID]; ok {
+			models = append(models, model)
+			continue
+		}
+		models = append(models, openai.Model{
+			ID:          modelID,
+			Object:      "model",
+			OwnedBy:     "openai",
+			Type:        "model",
+			DisplayName: modelID,
+		})
+	}
+	return models
 }
 
 // RefreshTier handles refreshing Google One tier for a single account

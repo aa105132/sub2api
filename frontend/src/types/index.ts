@@ -84,6 +84,14 @@ export interface CustomMenuItem {
   sort_order: number
 }
 
+export interface CustomEndpointModelSetting {
+  id: string
+  name: string
+  platform: AccountPlatform
+  base_url: string
+  models: string[]
+}
+
 export interface PublicSettings {
   registration_enabled: boolean
   email_verify_enabled: boolean

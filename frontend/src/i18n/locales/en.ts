@@ -4200,6 +4200,15 @@ export default {
         moveUp: 'Move Up',
         moveDown: 'Move Down',
       },
+      customEndpointModels: {
+        title: 'Custom Endpoint Models',
+        description: 'Maintain extra model lists by platform + base_url. Matching accounts will automatically expose these models in selectors and available-model lists.',
+        editorLabel: 'Endpoint Models JSON',
+        placeholder:
+          '[\n  {\n    \"id\": \"openai-local\",\n    \"name\": \"OpenAI Local\",\n    \"platform\": \"openai\",\n    \"base_url\": \"https://example.com/v1\",\n    \"models\": [\"gpt-5.1\", \"gpt-5.1-codex\"]\n  }\n]',
+        hint: 'Provide a JSON array. Each item must include id, name, platform, base_url, and models; models must be a string array.',
+        invalidArray: 'Custom endpoint models must be a JSON array'
+      },
       smtp: {
         title: 'SMTP Settings',
         description: 'Configure email sending for verification codes',

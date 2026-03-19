@@ -4366,6 +4366,15 @@ export default {
         moveUp: '上移',
         moveDown: '下移',
       },
+      customEndpointModels: {
+        title: '自定义端点模型',
+        description: '按平台 + base_url 维护额外模型列表，匹配的账号会在模型选择器和可用模型列表中自动显示这些模型。',
+        editorLabel: '端点模型 JSON',
+        placeholder:
+          '[\n  {\n    \"id\": \"openai-local\",\n    \"name\": \"OpenAI Local\",\n    \"platform\": \"openai\",\n    \"base_url\": \"https://example.com/v1\",\n    \"models\": [\"gpt-5.1\", \"gpt-5.1-codex\"]\n  }\n]',
+        hint: '请填写 JSON 数组。每项需包含 id、name、platform、base_url、models；models 为字符串数组。',
+        invalidArray: '自定义端点模型配置必须是 JSON 数组'
+      },
       smtp: {
         title: 'SMTP 设置',
         description: '配置用于发送验证码的邮件服务',

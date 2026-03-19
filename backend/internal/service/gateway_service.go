@@ -8363,20 +8363,32 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 
 	// Collect unique models from all accounts
 	modelSet := make(map[string]struct{})
-	hasAnyMapping := false
+	hasAnyConfiguredModels := false
 
 	for _, acc := range accounts {
 		mapping := acc.GetModelMapping()
 		if len(mapping) > 0 {
-			hasAnyMapping = true
+			hasAnyConfiguredModels = true
 			for model := range mapping {
 				modelSet[model] = struct{}{}
 			}
+			continue
+		}
+		if s.settingService == nil {
+			continue
+		}
+		customModels := s.settingService.GetCustomEndpointModelsForAccount(ctx, &acc)
+		if len(customModels) == 0 {
+			continue
+		}
+		hasAnyConfiguredModels = true
+		for _, model := range customModels {
+			modelSet[model] = struct{}{}
 		}
 	}
 
-	// If no account has model_mapping, return nil (use default)
-	if !hasAnyMapping {
+	// If no account has model_mapping or custom endpoint models, return nil (use default)
+	if !hasAnyConfiguredModels {
 		if s.modelsListCache != nil {
 			s.modelsListCache.Set(cacheKey, []string(nil), s.modelsListCacheTTL)
 			modelsListCacheStoreTotal.Add(1)

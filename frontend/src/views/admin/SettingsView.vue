@@ -1529,6 +1529,34 @@
           </div>
         </div>
 
+        <!-- Custom Endpoint Models -->
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.settings.customEndpointModels.title') }}
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin.settings.customEndpointModels.description') }}
+            </p>
+          </div>
+          <div class="space-y-3 p-6">
+            <div>
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('admin.settings.customEndpointModels.editorLabel') }}
+              </label>
+              <textarea
+                v-model="customEndpointModelsDraft"
+                rows="10"
+                class="input font-mono text-sm"
+                :placeholder="t('admin.settings.customEndpointModels.placeholder')"
+              />
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.settings.customEndpointModels.hint') }}
+            </p>
+          </div>
+        </div>
+
         </div><!-- /Tab: General -->
 
         <!-- Tab: Email -->
@@ -1841,6 +1869,7 @@ const sendingTestEmail = ref(false)
 const testEmailAddress = ref('')
 const registrationEmailSuffixWhitelistTags = ref<string[]>([])
 const registrationEmailSuffixWhitelistDraft = ref('')
+const customEndpointModelsDraft = ref('[]')
 
 // Admin API Key 状态
 const adminApiKeyLoading = ref(true)
@@ -1931,6 +1960,7 @@ const form = reactive<SettingsForm>({
   purchase_subscription_url: '',
   sora_client_enabled: false,
   custom_menu_items: [] as Array<{id: string; label: string; icon_svg: string; url: string; visibility: 'user' | 'admin'; sort_order: number}>,
+  custom_endpoint_models: [],
   frontend_url: '',
   smtp_host: '',
   smtp_port: 587,
@@ -1970,6 +2000,30 @@ const form = reactive<SettingsForm>({
   // 分组隔离
   allow_ungrouped_key_scheduling: false
 })
+
+function stringifyCustomEndpointModels(value: unknown): string {
+  if (!Array.isArray(value) || value.length === 0) {
+    return '[]'
+  }
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return '[]'
+  }
+}
+
+function parseCustomEndpointModelsDraft(): SettingsForm['custom_endpoint_models'] {
+  const raw = customEndpointModelsDraft.value.trim()
+  if (!raw) {
+    return []
+  }
+
+  const parsed = JSON.parse(raw)
+  if (!Array.isArray(parsed)) {
+    throw new Error(t('admin.settings.customEndpointModels.invalidArray'))
+  }
+  return parsed as SettingsForm['custom_endpoint_models']
+}
 
 const defaultSubscriptionGroupOptions = computed<DefaultSubscriptionGroupOption[]>(() =>
   subscriptionGroups.value.map((group) => ({
@@ -2117,6 +2171,7 @@ async function loadSettings() {
       settings.registration_email_suffix_whitelist
     )
     registrationEmailSuffixWhitelistDraft.value = ''
+    customEndpointModelsDraft.value = stringifyCustomEndpointModels(settings.custom_endpoint_models)
     form.smtp_password = ''
     form.turnstile_secret_key = ''
     form.linuxdo_connect_client_secret = ''
@@ -2159,6 +2214,7 @@ function removeDefaultSubscription(index: number) {
 async function saveSettings() {
   saving.value = true
   try {
+    const customEndpointModels = parseCustomEndpointModelsDraft()
     const normalizedDefaultSubscriptions = form.default_subscriptions
       .filter((item) => item.group_id > 0 && item.validity_days > 0)
       .map((item: DefaultSubscriptionSetting) => ({
@@ -2209,6 +2265,7 @@ async function saveSettings() {
       purchase_subscription_url: form.purchase_subscription_url,
       sora_client_enabled: form.sora_client_enabled,
       custom_menu_items: form.custom_menu_items,
+      custom_endpoint_models: customEndpointModels,
       frontend_url: form.frontend_url,
       smtp_host: form.smtp_host,
       smtp_port: form.smtp_port,
@@ -2240,6 +2297,7 @@ async function saveSettings() {
       updated.registration_email_suffix_whitelist
     )
     registrationEmailSuffixWhitelistDraft.value = ''
+    customEndpointModelsDraft.value = stringifyCustomEndpointModels(updated.custom_endpoint_models)
     form.smtp_password = ''
     form.turnstile_secret_key = ''
     form.linuxdo_connect_client_secret = ''

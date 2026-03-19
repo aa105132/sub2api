@@ -167,6 +167,7 @@
             <ModelWhitelistSelector
               v-model="allowedModels"
               :platforms="selectedPlatforms"
+              :base-urls="bulkModelSelectorBaseUrls"
             />
 
             <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -896,6 +897,10 @@ const pendingUpdatesForConfirm = ref<Record<string, unknown> | null>(null)
 const baseUrl = ref('')
 const modelRestrictionMode = ref<'whitelist' | 'mapping'>('whitelist')
 const allowedModels = ref<string[]>([])
+const bulkModelSelectorBaseUrls = computed(() => {
+  const value = baseUrl.value.trim()
+  return enableBaseUrl.value && value ? [value] : []
+})
 const modelMappings = ref<ModelMapping[]>([])
 const selectedErrorCodes = ref<number[]>([])
 const customErrorCodeInput = ref<number | null>(null)

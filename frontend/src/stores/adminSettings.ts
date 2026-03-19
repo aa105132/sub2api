@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { adminAPI } from '@/api'
-import type { CustomMenuItem } from '@/types'
+import type { CustomEndpointModelSetting, CustomMenuItem } from '@/types'
 
 export const useAdminSettingsStore = defineStore('adminSettings', () => {
   const loaded = ref(false)
@@ -49,6 +49,7 @@ export const useAdminSettingsStore = defineStore('adminSettings', () => {
   const opsRealtimeMonitoringEnabled = ref(readCachedBool('ops_realtime_monitoring_enabled_cached', true))
   const opsQueryModeDefault = ref(readCachedString('ops_query_mode_default_cached', 'auto'))
   const customMenuItems = ref<CustomMenuItem[]>([])
+  const customEndpointModels = ref<CustomEndpointModelSetting[]>([])
 
   async function fetch(force = false): Promise<void> {
     if (loaded.value && !force) return
@@ -67,6 +68,9 @@ export const useAdminSettingsStore = defineStore('adminSettings', () => {
       writeCachedString('ops_query_mode_default_cached', opsQueryModeDefault.value)
 
       customMenuItems.value = Array.isArray(settings.custom_menu_items) ? settings.custom_menu_items : []
+      customEndpointModels.value = Array.isArray(settings.custom_endpoint_models)
+        ? settings.custom_endpoint_models
+        : []
 
       loaded.value = true
     } catch (err) {
@@ -127,6 +131,7 @@ export const useAdminSettingsStore = defineStore('adminSettings', () => {
     opsRealtimeMonitoringEnabled,
     opsQueryModeDefault,
     customMenuItems,
+    customEndpointModels,
     fetch,
     setOpsMonitoringEnabledLocal,
     setOpsRealtimeMonitoringEnabledLocal,

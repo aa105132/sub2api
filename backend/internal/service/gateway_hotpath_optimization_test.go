@@ -117,6 +117,45 @@ type modelsListAccountRepoStub struct {
 	listAllCalls     atomic.Int64
 }
 
+type modelsListSettingRepoStub struct {
+	SettingRepository
+
+	values map[string]string
+}
+
+func (s *modelsListSettingRepoStub) Get(ctx context.Context, key string) (*Setting, error) {
+	panic("unexpected Get call")
+}
+
+func (s *modelsListSettingRepoStub) GetValue(ctx context.Context, key string) (string, error) {
+	if s.values != nil {
+		if value, ok := s.values[key]; ok {
+			return value, nil
+		}
+	}
+	return "", ErrSettingNotFound
+}
+
+func (s *modelsListSettingRepoStub) Set(ctx context.Context, key, value string) error {
+	panic("unexpected Set call")
+}
+
+func (s *modelsListSettingRepoStub) GetMultiple(ctx context.Context, keys []string) (map[string]string, error) {
+	panic("unexpected GetMultiple call")
+}
+
+func (s *modelsListSettingRepoStub) SetMultiple(ctx context.Context, settings map[string]string) error {
+	panic("unexpected SetMultiple call")
+}
+
+func (s *modelsListSettingRepoStub) GetAll(ctx context.Context) (map[string]string, error) {
+	panic("unexpected GetAll call")
+}
+
+func (s *modelsListSettingRepoStub) Delete(ctx context.Context, key string) error {
+	panic("unexpected Delete call")
+}
+
 type stickyGatewayCacheHotpathStub struct {
 	GatewayCache
 
@@ -578,6 +617,44 @@ func TestGetAvailableModels_ErrorAndGlobalListBranches(t *testing.T) {
 	models := svcOK.GetAvailableModels(context.Background(), nil, "")
 	require.Equal(t, []string{"claude-3-5-sonnet", "gemini-2.5-pro"}, models)
 	require.Equal(t, int64(1), okRepo.listAllCalls.Load())
+}
+
+func TestGatewayService_GetAvailableModels_UsesCustomEndpointModels(t *testing.T) {
+	resetGatewayHotpathStatsForTest()
+
+	groupID := int64(11)
+	repo := &modelsListAccountRepoStub{
+		byGroup: map[int64][]Account{
+			groupID: {
+				{
+					ID:       1,
+					Platform: PlatformOpenAI,
+					Credentials: map[string]any{
+						"base_url": "https://api.example.com/v1",
+					},
+				},
+			},
+		},
+	}
+	settingSvc := NewSettingService(&modelsListSettingRepoStub{
+		values: map[string]string{
+			SettingKeyCustomEndpointModels: `[{"id":"openai-local","name":"OpenAI Local","platform":"openai","base_url":"https://api.example.com/v1/","models":["gpt-5.1-codex","gpt-5.1"]}]`,
+		},
+	}, &config.Config{})
+	svc := &GatewayService{
+		accountRepo:        repo,
+		settingService:     settingSvc,
+		modelsListCache:    gocache.New(time.Minute, time.Minute),
+		modelsListCacheTTL: time.Minute,
+	}
+
+	models := svc.GetAvailableModels(context.Background(), &groupID, PlatformOpenAI)
+	require.Equal(t, []string{"gpt-5.1", "gpt-5.1-codex"}, models)
+	require.Equal(t, int64(1), repo.listByGroupCalls.Load())
+
+	modelsCached := svc.GetAvailableModels(context.Background(), &groupID, PlatformOpenAI)
+	require.Equal(t, models, modelsCached)
+	require.Equal(t, int64(1), repo.listByGroupCalls.Load())
 }
 
 func TestGatewayHotpathHelpers_CacheTTLAndStickyContext(t *testing.T) {

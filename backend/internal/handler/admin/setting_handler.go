@@ -110,6 +110,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		PurchaseSubscriptionURL:              settings.PurchaseSubscriptionURL,
 		SoraClientEnabled:                    settings.SoraClientEnabled,
 		CustomMenuItems:                      dto.ParseCustomMenuItems(settings.CustomMenuItems),
+		CustomEndpointModels:                 serviceCustomEndpointModelsToDTO(settings.CustomEndpointModels),
 		DefaultConcurrency:                   settings.DefaultConcurrency,
 		DefaultBalance:                       settings.DefaultBalance,
 		DefaultSubscriptions:                 defaultSubscriptions,
@@ -163,18 +164,19 @@ type UpdateSettingsRequest struct {
 	LinuxDoConnectRedirectURL  string `json:"linuxdo_connect_redirect_url"`
 
 	// OEM设置
-	SiteName                    string                `json:"site_name"`
-	SiteLogo                    string                `json:"site_logo"`
-	SiteSubtitle                string                `json:"site_subtitle"`
-	APIBaseURL                  string                `json:"api_base_url"`
-	ContactInfo                 string                `json:"contact_info"`
-	DocURL                      string                `json:"doc_url"`
-	HomeContent                 string                `json:"home_content"`
-	HideCcsImportButton         bool                  `json:"hide_ccs_import_button"`
-	PurchaseSubscriptionEnabled *bool                 `json:"purchase_subscription_enabled"`
-	PurchaseSubscriptionURL     *string               `json:"purchase_subscription_url"`
-	SoraClientEnabled           bool                  `json:"sora_client_enabled"`
-	CustomMenuItems             *[]dto.CustomMenuItem `json:"custom_menu_items"`
+	SiteName                    string                           `json:"site_name"`
+	SiteLogo                    string                           `json:"site_logo"`
+	SiteSubtitle                string                           `json:"site_subtitle"`
+	APIBaseURL                  string                           `json:"api_base_url"`
+	ContactInfo                 string                           `json:"contact_info"`
+	DocURL                      string                           `json:"doc_url"`
+	HomeContent                 string                           `json:"home_content"`
+	HideCcsImportButton         bool                             `json:"hide_ccs_import_button"`
+	PurchaseSubscriptionEnabled *bool                            `json:"purchase_subscription_enabled"`
+	PurchaseSubscriptionURL     *string                          `json:"purchase_subscription_url"`
+	SoraClientEnabled           bool                             `json:"sora_client_enabled"`
+	CustomMenuItems             *[]dto.CustomMenuItem            `json:"custom_menu_items"`
+	CustomEndpointModels        []dto.CustomEndpointModelSetting `json:"custom_endpoint_models"`
 
 	// 默认配置
 	DefaultConcurrency   int                              `json:"default_concurrency"`
@@ -477,6 +479,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		PurchaseSubscriptionURL:          purchaseURL,
 		SoraClientEnabled:                req.SoraClientEnabled,
 		CustomMenuItems:                  customMenuJSON,
+		CustomEndpointModels:             dtoCustomEndpointModelsToService(req.CustomEndpointModels),
 		DefaultConcurrency:               req.DefaultConcurrency,
 		DefaultBalance:                   req.DefaultBalance,
 		DefaultSubscriptions:             defaultSubscriptions,
@@ -573,6 +576,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		PurchaseSubscriptionURL:              updatedSettings.PurchaseSubscriptionURL,
 		SoraClientEnabled:                    updatedSettings.SoraClientEnabled,
 		CustomMenuItems:                      dto.ParseCustomMenuItems(updatedSettings.CustomMenuItems),
+		CustomEndpointModels:                 serviceCustomEndpointModelsToDTO(updatedSettings.CustomEndpointModels),
 		DefaultConcurrency:                   updatedSettings.DefaultConcurrency,
 		DefaultBalance:                       updatedSettings.DefaultBalance,
 		DefaultSubscriptions:                 updatedDefaultSubscriptions,
@@ -759,6 +763,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.CustomMenuItems != after.CustomMenuItems {
 		changed = append(changed, "custom_menu_items")
 	}
+	if !equalCustomEndpointModelSettings(before.CustomEndpointModels, after.CustomEndpointModels) {
+		changed = append(changed, "custom_endpoint_models")
+	}
 	return changed
 }
 
@@ -801,6 +808,56 @@ func equalDefaultSubscriptions(a, b []service.DefaultSubscriptionSetting) bool {
 		}
 	}
 	return true
+}
+
+func equalCustomEndpointModelSettings(a, b []service.CustomEndpointModelSetting) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].ID != b[i].ID ||
+			a[i].Name != b[i].Name ||
+			a[i].Platform != b[i].Platform ||
+			a[i].BaseURL != b[i].BaseURL ||
+			!equalStringSlice(a[i].Models, b[i].Models) {
+			return false
+		}
+	}
+	return true
+}
+
+func serviceCustomEndpointModelsToDTO(items []service.CustomEndpointModelSetting) []dto.CustomEndpointModelSetting {
+	if len(items) == 0 {
+		return []dto.CustomEndpointModelSetting{}
+	}
+	result := make([]dto.CustomEndpointModelSetting, 0, len(items))
+	for _, item := range items {
+		result = append(result, dto.CustomEndpointModelSetting{
+			ID:       item.ID,
+			Name:     item.Name,
+			Platform: item.Platform,
+			BaseURL:  item.BaseURL,
+			Models:   append([]string(nil), item.Models...),
+		})
+	}
+	return result
+}
+
+func dtoCustomEndpointModelsToService(items []dto.CustomEndpointModelSetting) []service.CustomEndpointModelSetting {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]service.CustomEndpointModelSetting, 0, len(items))
+	for _, item := range items {
+		result = append(result, service.CustomEndpointModelSetting{
+			ID:       item.ID,
+			Name:     item.Name,
+			Platform: item.Platform,
+			BaseURL:  item.BaseURL,
+			Models:   append([]string(nil), item.Models...),
+		})
+	}
+	return result
 }
 
 // TestSMTPRequest 测试SMTP连接请求
