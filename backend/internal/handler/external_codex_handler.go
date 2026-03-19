@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -213,7 +214,142 @@ func bindExternalCodexJSON(c *gin.Context, target any) bool {
 		writeExternalCodexDetail(c, http.StatusBadRequest, "请求体 JSON 无效: "+err.Error())
 		return false
 	}
+	fillExternalCodexCompatInput(target, body)
 	return true
+}
+
+func fillExternalCodexCompatInput(target any, body []byte) {
+	if target == nil || len(bytes.TrimSpace(body)) == 0 {
+		return
+	}
+
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return
+	}
+
+	switch input := target.(type) {
+	case *service.CodexExternalAuthInput:
+		fillExternalCodexAuthAliases(payload, input)
+	case *service.CodexExternalCallbackInput:
+		fillInt64JSONAlias(payload, &input.UserID, "user_id", "userId")
+		fillStringJSONAlias(payload, &input.CallbackURL, "callback_url", "callbackUrl")
+		fillStringJSONAlias(payload, &input.State, "state")
+		fillBoolJSONAlias(payload, &input.IsPublic, "is_public", "isPublic")
+	case *service.CodexExternalDirectPushInput:
+		fillExternalCodexAuthAliases(payload, &input.CodexExternalAuthInput)
+		fillStringJSONAlias(payload, &input.AccessToken, "access_token", "accessToken")
+		fillStringJSONAlias(payload, &input.RefreshToken, "refresh_token", "refreshToken")
+		fillStringJSONAlias(payload, &input.AccountID, "account_id", "accountId")
+		fillStringJSONAlias(payload, &input.PlanType, "plan_type", "planType")
+		fillStringJSONAlias(payload, &input.TeamAccountID, "team_account_id", "teamAccountId")
+		fillInt64JSONAlias(payload, &input.TeamOwnerCredentialID, "team_owner_credential_id", "teamOwnerCredentialId")
+		fillBoolJSONAlias(payload, &input.IsPublic, "is_public", "isPublic")
+	case *service.CodexExternalTeamInfoInput:
+		fillExternalCodexAuthAliases(payload, &input.CodexExternalAuthInput)
+		fillInt64JSONAlias(payload, &input.OwnerCredentialID, "owner_credential_id", "ownerCredentialId")
+		fillStringJSONAlias(payload, &input.TeamAccountID, "team_account_id", "teamAccountId")
+		fillBoolJSONAlias(payload, &input.IncludeMembers, "include_members", "includeMembers")
+	case *service.CodexExternalTeamInviteInput:
+		fillExternalCodexAuthAliases(payload, &input.CodexExternalAuthInput)
+		fillInt64JSONAlias(payload, &input.OwnerCredentialID, "owner_credential_id", "ownerCredentialId")
+	case *service.CodexExternalTeamKickInput:
+		fillExternalCodexAuthAliases(payload, &input.CodexExternalAuthInput)
+		fillInt64JSONAlias(payload, &input.OwnerCredentialID, "owner_credential_id", "ownerCredentialId")
+		fillStringJSONAlias(payload, &input.TeamAccountID, "team_account_id", "teamAccountId")
+		fillStringJSONAlias(payload, &input.TeamMemberUserID, "team_member_user_id", "teamMemberUserId")
+	}
+}
+
+func fillExternalCodexAuthAliases(payload map[string]json.RawMessage, input *service.CodexExternalAuthInput) {
+	if input == nil {
+		return
+	}
+	fillStringJSONAlias(payload, &input.APIKey, "api_key", "apiKey")
+	fillStringJSONAlias(payload, &input.AdminPassword, "admin_password", "adminPassword")
+}
+
+func fillStringJSONAlias(payload map[string]json.RawMessage, target *string, keys ...string) {
+	if target == nil {
+		return
+	}
+
+	value, ok := lookupJSONAlias(payload, keys...)
+	if !ok {
+		return
+	}
+
+	var decoded string
+	if err := json.Unmarshal(value, &decoded); err == nil {
+		*target = decoded
+	}
+}
+
+func fillInt64JSONAlias(payload map[string]json.RawMessage, target *int64, keys ...string) {
+	if target == nil {
+		return
+	}
+
+	value, ok := lookupJSONAlias(payload, keys...)
+	if !ok {
+		return
+	}
+
+	var decoded int64
+	if err := json.Unmarshal(value, &decoded); err == nil {
+		*target = decoded
+		return
+	}
+
+	var text string
+	if err := json.Unmarshal(value, &text); err != nil {
+		return
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
+		*target = 0
+		return
+	}
+	parsed, err := strconv.ParseInt(text, 10, 64)
+	if err == nil {
+		*target = parsed
+	}
+}
+
+func fillBoolJSONAlias(payload map[string]json.RawMessage, target *bool, keys ...string) {
+	if target == nil {
+		return
+	}
+
+	value, ok := lookupJSONAlias(payload, keys...)
+	if !ok {
+		return
+	}
+
+	var decoded bool
+	if err := json.Unmarshal(value, &decoded); err == nil {
+		*target = decoded
+		return
+	}
+
+	var text string
+	if err := json.Unmarshal(value, &text); err != nil {
+		return
+	}
+	parsed, err := strconv.ParseBool(strings.TrimSpace(text))
+	if err == nil {
+		*target = parsed
+	}
+}
+
+func lookupJSONAlias(payload map[string]json.RawMessage, keys ...string) (json.RawMessage, bool) {
+	for _, key := range keys {
+		value, ok := payload[key]
+		if ok {
+			return value, true
+		}
+	}
+	return nil, false
 }
 
 func fillExternalCodexAuthInput(c *gin.Context, input *service.CodexExternalAuthInput) {

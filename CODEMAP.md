@@ -94,6 +94,7 @@
     - 成功直接返回原始 JSON
     - 失败统一返回 `{"detail":"..."}`
     - 会从 body / header / query 兜底取 `api_key`、`admin_password`
+    - `bindExternalCodexJSON` 已兼容 `snake_case` / `camelCase` 外部请求体，便于对接 `CatieCli`
   - 关联：`backend/internal/service/codex_external_service.go`
 
 ## Service 层
@@ -187,6 +188,11 @@
 - `backend/internal/service/openai_gateway_compat_codex_test.go`
   - 作用：验证 Codex OAuth 在 `/v1/chat/completions` 与 `/v1/messages` 下的格式转换、session / cache 透传是否正确。
   - 适用场景：改兼容层、改请求转换、改响应转换时优先回归这里。
+
+- `backend/internal/handler/external_codex_handler_test.go`
+  - 作用：验证 external codex 接口能正确解析 `snake_case` 请求体。
+  - 本次改动：覆盖 `direct-push`、`team/info` 对 `api_key`、`access_token`、`owner_credential_id`、`include_members` 等字段的兼容绑定。
+  - 关联：`backend/internal/handler/external_codex_handler.go`
 
 ## 最近补充
 
