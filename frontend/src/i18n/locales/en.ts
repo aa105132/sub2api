@@ -4203,11 +4203,33 @@ export default {
       customEndpointModels: {
         title: 'Custom Endpoint Models',
         description: 'Maintain extra model lists by platform + base_url. Matching accounts will automatically expose these models in selectors and available-model lists.',
-        editorLabel: 'Endpoint Models JSON',
-        placeholder:
-          '[\n  {\n    \"id\": \"openai-local\",\n    \"name\": \"OpenAI Local\",\n    \"platform\": \"openai\",\n    \"base_url\": \"https://example.com/v1\",\n    \"models\": [\"gpt-5.1\", \"gpt-5.1-codex\"]\n  }\n]',
-        hint: 'Provide a JSON array. Each item must include id, name, platform, base_url, and models; models must be a string array.',
-        invalidArray: 'Custom endpoint models must be a JSON array'
+        empty: 'No custom endpoint models configured yet. Add platform + base_url model catalogs here.',
+        itemLabel: 'Endpoint Model #{n}',
+        id: 'ID',
+        idPlaceholder: 'e.g. openai-local',
+        name: 'Display Name',
+        namePlaceholder: 'e.g. OpenAI Local',
+        platformLabel: 'Platform',
+        baseUrl: 'Base URL',
+        baseUrlPlaceholder: 'https://example.com/v1',
+        models: 'Models',
+        modelsPlaceholder: 'Type a model name, then press Enter / Tab / comma',
+        modelsInputHint: 'You can add models one by one or paste multiple names at once. Empty values and duplicates are removed on save.',
+        hint: 'Matching uses exact “platform + normalized base_url”. Fully blank rows are ignored when saving.',
+        add: 'Add Endpoint Model',
+        remove: 'Remove',
+        moveUp: 'Move Up',
+        moveDown: 'Move Down',
+        invalidPlatform: 'Row {n} has an invalid platform',
+        invalidUrl: 'Row {n} has an invalid Base URL',
+        modelsRequired: 'Row {n} must include at least one model',
+        platform: {
+          openai: 'OpenAI',
+          anthropic: 'Anthropic / Claude',
+          gemini: 'Gemini',
+          antigravity: 'Antigravity',
+          sora: 'Sora'
+        }
       },
       smtp: {
         title: 'SMTP Settings',

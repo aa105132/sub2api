@@ -231,7 +231,7 @@
 - `frontend/src/views/admin/SettingsView.vue`
   - 入口：`loadSettings`、`saveSettings`
   - 作用：管理员系统设置页。
-  - 本次改动：新增“自定义端点模型”编辑区，使用 JSON 文本框维护 `custom_endpoint_models`。
+  - 本次改动：把“自定义端点模型”从 JSON 文本框改成可视化表单，支持行级增删/上下移动、平台选择、`base_url` 输入和模型标签录入。
   - 关联：`frontend/src/api/admin/settings.ts`、`frontend/src/stores/adminSettings.ts`
 
 - `frontend/src/stores/adminSettings.ts`

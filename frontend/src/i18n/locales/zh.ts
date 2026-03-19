@@ -4369,11 +4369,33 @@ export default {
       customEndpointModels: {
         title: '自定义端点模型',
         description: '按平台 + base_url 维护额外模型列表，匹配的账号会在模型选择器和可用模型列表中自动显示这些模型。',
-        editorLabel: '端点模型 JSON',
-        placeholder:
-          '[\n  {\n    \"id\": \"openai-local\",\n    \"name\": \"OpenAI Local\",\n    \"platform\": \"openai\",\n    \"base_url\": \"https://example.com/v1\",\n    \"models\": [\"gpt-5.1\", \"gpt-5.1-codex\"]\n  }\n]',
-        hint: '请填写 JSON 数组。每项需包含 id、name、platform、base_url、models；models 为字符串数组。',
-        invalidArray: '自定义端点模型配置必须是 JSON 数组'
+        empty: '暂未配置自定义端点模型，可添加多组平台 + base_url 的模型目录。',
+        itemLabel: '端点模型 #{n}',
+        id: '标识 ID',
+        idPlaceholder: '如：openai-local',
+        name: '显示名称',
+        namePlaceholder: '如：OpenAI Local',
+        platformLabel: '平台',
+        baseUrl: 'Base URL',
+        baseUrlPlaceholder: 'https://example.com/v1',
+        models: '模型列表',
+        modelsPlaceholder: '输入模型名后按 Enter / Tab / 逗号添加',
+        modelsInputHint: '支持逐个输入，也支持一次粘贴多个模型名；保存时会自动去重并清理空值。',
+        hint: '匹配逻辑为“平台 + 规范化 base_url”完全一致。留空的整行会在保存时自动忽略。',
+        add: '添加端点模型',
+        remove: '删除',
+        moveUp: '上移',
+        moveDown: '下移',
+        invalidPlatform: '第 {n} 项的平台无效',
+        invalidUrl: '第 {n} 项的 Base URL 无效',
+        modelsRequired: '第 {n} 项至少需要填写一个模型',
+        platform: {
+          openai: 'OpenAI',
+          anthropic: 'Anthropic / Claude',
+          gemini: 'Gemini',
+          antigravity: 'Antigravity',
+          sora: 'Sora'
+        }
       },
       smtp: {
         title: 'SMTP 设置',

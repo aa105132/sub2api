@@ -1539,18 +1539,160 @@
               {{ t('admin.settings.customEndpointModels.description') }}
             </p>
           </div>
-          <div class="space-y-3 p-6">
-            <div>
-              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                {{ t('admin.settings.customEndpointModels.editorLabel') }}
-              </label>
-              <textarea
-                v-model="customEndpointModelsDraft"
-                rows="10"
-                class="input font-mono text-sm"
-                :placeholder="t('admin.settings.customEndpointModels.placeholder')"
-              />
+          <div class="space-y-4 p-6">
+            <div
+              v-if="form.custom_endpoint_models.length === 0"
+              class="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-dark-600 dark:text-gray-400"
+            >
+              {{ t('admin.settings.customEndpointModels.empty') }}
             </div>
+
+            <div
+              v-for="(item, index) in form.custom_endpoint_models"
+              :key="`${item.id || 'custom-endpoint'}-${index}`"
+              class="rounded-lg border border-gray-200 p-4 dark:border-dark-600"
+            >
+              <div class="mb-4 flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.customEndpointModels.itemLabel', { n: index + 1 }) }}
+                </span>
+                <div class="flex items-center gap-2">
+                  <button
+                    v-if="index > 0"
+                    type="button"
+                    class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-dark-700"
+                    :title="t('admin.settings.customEndpointModels.moveUp')"
+                    @click="moveCustomEndpointModel(index, -1)"
+                  >
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg>
+                  </button>
+                  <button
+                    v-if="index < form.custom_endpoint_models.length - 1"
+                    type="button"
+                    class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-dark-700"
+                    :title="t('admin.settings.customEndpointModels.moveDown')"
+                    @click="moveCustomEndpointModel(index, 1)"
+                  >
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                    :title="t('admin.settings.customEndpointModels.remove')"
+                    @click="removeCustomEndpointModel(index)"
+                  >
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    {{ t('admin.settings.customEndpointModels.id') }}
+                  </label>
+                  <input
+                    v-model="item.id"
+                    type="text"
+                    class="input text-sm"
+                    :placeholder="t('admin.settings.customEndpointModels.idPlaceholder')"
+                  />
+                </div>
+
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    {{ t('admin.settings.customEndpointModels.name') }}
+                  </label>
+                  <input
+                    v-model="item.name"
+                    type="text"
+                    class="input text-sm"
+                    :placeholder="t('admin.settings.customEndpointModels.namePlaceholder')"
+                  />
+                </div>
+
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    {{ t('admin.settings.customEndpointModels.platformLabel') }}
+                  </label>
+                  <select v-model="item.platform" class="input text-sm">
+                    <option
+                      v-for="platform in customEndpointPlatforms"
+                      :key="platform"
+                      :value="platform"
+                    >
+                      {{ getCustomEndpointPlatformLabel(platform) }}
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    {{ t('admin.settings.customEndpointModels.baseUrl') }}
+                  </label>
+                  <input
+                    v-model="item.base_url"
+                    type="url"
+                    class="input font-mono text-sm"
+                    :placeholder="t('admin.settings.customEndpointModels.baseUrlPlaceholder')"
+                    @blur="normalizeEditableCustomEndpointBaseUrl(item)"
+                  />
+                </div>
+
+                <div class="sm:col-span-2">
+                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    {{ t('admin.settings.customEndpointModels.models') }}
+                  </label>
+                  <div
+                    class="rounded-lg border border-gray-300 bg-white p-2 dark:border-dark-500 dark:bg-dark-700"
+                  >
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span
+                        v-for="model in item.models"
+                        :key="model"
+                        class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-1 text-xs font-mono text-gray-700 dark:bg-dark-600 dark:text-gray-200"
+                      >
+                        <span>{{ model }}</span>
+                        <button
+                          type="button"
+                          class="rounded-full text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-dark-500 dark:hover:text-white"
+                          @click="removeCustomEndpointModelName(index, model)"
+                        >
+                          <Icon name="x" size="xs" class="h-3.5 w-3.5" :stroke-width="2" />
+                        </button>
+                      </span>
+
+                      <div
+                        class="flex min-w-[240px] flex-1 items-center gap-1 rounded border border-transparent px-2 py-1 focus-within:border-primary-300 dark:focus-within:border-primary-700"
+                      >
+                        <input
+                          v-model="item.models_draft"
+                          type="text"
+                          class="w-full bg-transparent text-sm font-mono text-gray-900 outline-none placeholder:text-gray-400 dark:text-white dark:placeholder:text-gray-500"
+                          :placeholder="t('admin.settings.customEndpointModels.modelsPlaceholder')"
+                          @keydown="handleCustomEndpointModelDraftKeydown(index, $event)"
+                          @blur="commitCustomEndpointModelDraft(index)"
+                          @paste="handleCustomEndpointModelPaste(index, $event)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('admin.settings.customEndpointModels.modelsInputHint') }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 py-3 text-sm text-gray-500 transition-colors hover:border-primary-400 hover:text-primary-600 dark:border-dark-600 dark:text-gray-400 dark:hover:border-primary-500 dark:hover:text-primary-400"
+              @click="addCustomEndpointModel"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+              {{ t('admin.settings.customEndpointModels.add') }}
+            </button>
+
             <p class="text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.settings.customEndpointModels.hint') }}
             </p>
@@ -1825,7 +1967,7 @@ import type {
   UpdateSettingsRequest,
   DefaultSubscriptionSetting
 } from '@/api/admin/settings'
-import type { AdminGroup } from '@/types'
+import type { AdminGroup, AccountPlatform, CustomEndpointModelSetting } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import Select from '@/components/common/Select.vue'
@@ -1869,7 +2011,6 @@ const sendingTestEmail = ref(false)
 const testEmailAddress = ref('')
 const registrationEmailSuffixWhitelistTags = ref<string[]>([])
 const registrationEmailSuffixWhitelistDraft = ref('')
-const customEndpointModelsDraft = ref('[]')
 
 // Admin API Key 状态
 const adminApiKeyLoading = ref(true)
@@ -1929,7 +2070,12 @@ interface DefaultSubscriptionGroupOption {
   [key: string]: unknown
 }
 
-type SettingsForm = SystemSettings & {
+type EditableCustomEndpointModelSetting = CustomEndpointModelSetting & {
+  models_draft: string
+}
+
+type SettingsForm = Omit<SystemSettings, 'custom_endpoint_models'> & {
+  custom_endpoint_models: EditableCustomEndpointModelSetting[]
   smtp_password: string
   turnstile_secret_key: string
   linuxdo_connect_client_secret: string
@@ -1960,7 +2106,7 @@ const form = reactive<SettingsForm>({
   purchase_subscription_url: '',
   sora_client_enabled: false,
   custom_menu_items: [] as Array<{id: string; label: string; icon_svg: string; url: string; visibility: 'user' | 'admin'; sort_order: number}>,
-  custom_endpoint_models: [],
+  custom_endpoint_models: [] as EditableCustomEndpointModelSetting[],
   frontend_url: '',
   smtp_host: '',
   smtp_port: 587,
@@ -2001,28 +2147,235 @@ const form = reactive<SettingsForm>({
   allow_ungrouped_key_scheduling: false
 })
 
-function stringifyCustomEndpointModels(value: unknown): string {
-  if (!Array.isArray(value) || value.length === 0) {
-    return '[]'
+const customEndpointPlatforms: AccountPlatform[] = [
+  'openai',
+  'anthropic',
+  'gemini',
+  'antigravity',
+  'sora'
+]
+
+const customEndpointModelSeparatorKeys = new Set([',', '，', 'Enter', 'Tab'])
+
+function isCustomEndpointPlatform(value: unknown): value is AccountPlatform {
+  return typeof value === 'string' && customEndpointPlatforms.includes(value as AccountPlatform)
+}
+
+function getCustomEndpointPlatformLabel(platform: AccountPlatform): string {
+  return t(`admin.settings.customEndpointModels.platform.${platform}`)
+}
+
+function normalizeCustomEndpointModelNames(models: string[]): string[] {
+  const seen = new Set<string>()
+  const normalized: string[] = []
+
+  for (const model of models) {
+    const value = model.trim()
+    if (!value || seen.has(value)) {
+      continue
+    }
+    seen.add(value)
+    normalized.push(value)
   }
+
+  return normalized
+}
+
+function normalizeCustomEndpointBaseUrl(raw: string): string {
+  const value = raw.trim()
+  if (!value) {
+    return ''
+  }
+
   try {
-    return JSON.stringify(value, null, 2)
+    const parsed = new URL(value)
+    if (!parsed.protocol || !parsed.host) {
+      return ''
+    }
+
+    const pathname = parsed.pathname.replace(/\/+$/, '')
+    return `${parsed.protocol.toLowerCase()}//${parsed.host.toLowerCase()}${
+      pathname === '/' ? '' : pathname
+    }`
   } catch {
-    return '[]'
+    return ''
   }
 }
 
-function parseCustomEndpointModelsDraft(): SettingsForm['custom_endpoint_models'] {
-  const raw = customEndpointModelsDraft.value.trim()
-  if (!raw) {
+function createEmptyCustomEndpointModel(): EditableCustomEndpointModelSetting {
+  return {
+    id: '',
+    name: '',
+    platform: 'openai',
+    base_url: '',
+    models: [],
+    models_draft: ''
+  }
+}
+
+function toEditableCustomEndpointModels(value: unknown): EditableCustomEndpointModelSetting[] {
+  if (!Array.isArray(value)) {
     return []
   }
 
-  const parsed = JSON.parse(raw)
-  if (!Array.isArray(parsed)) {
-    throw new Error(t('admin.settings.customEndpointModels.invalidArray'))
+  return value.map((item) => {
+    const record = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+    return {
+      id: typeof record.id === 'string' ? record.id : '',
+      name: typeof record.name === 'string' ? record.name : '',
+      platform: isCustomEndpointPlatform(record.platform) ? record.platform : 'openai',
+      base_url: typeof record.base_url === 'string' ? record.base_url : '',
+      models: normalizeCustomEndpointModelNames(
+        Array.isArray(record.models)
+          ? record.models.filter((model): model is string => typeof model === 'string')
+          : []
+      ),
+      models_draft: ''
+    }
+  })
+}
+
+function parseCustomEndpointModelInput(raw: string): string[] {
+  return raw
+    .split(/[\s,，]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function normalizeEditableCustomEndpointBaseUrl(item: EditableCustomEndpointModelSetting) {
+  const normalized = normalizeCustomEndpointBaseUrl(item.base_url)
+  item.base_url = normalized || item.base_url.trim()
+}
+
+function addCustomEndpointModel() {
+  form.custom_endpoint_models.push(createEmptyCustomEndpointModel())
+}
+
+function removeCustomEndpointModel(index: number) {
+  form.custom_endpoint_models.splice(index, 1)
+}
+
+function moveCustomEndpointModel(index: number, direction: -1 | 1) {
+  const targetIndex = index + direction
+  if (targetIndex < 0 || targetIndex >= form.custom_endpoint_models.length) {
+    return
   }
-  return parsed as SettingsForm['custom_endpoint_models']
+
+  const items = form.custom_endpoint_models
+  const temp = items[index]
+  items[index] = items[targetIndex]
+  items[targetIndex] = temp
+}
+
+function removeCustomEndpointModelName(index: number, model: string) {
+  const item = form.custom_endpoint_models[index]
+  if (!item) {
+    return
+  }
+  item.models = item.models.filter((current) => current !== model)
+}
+
+function commitCustomEndpointModelDraft(index: number) {
+  const item = form.custom_endpoint_models[index]
+  if (!item || !item.models_draft.trim()) {
+    return
+  }
+
+  item.models = normalizeCustomEndpointModelNames([
+    ...item.models,
+    ...parseCustomEndpointModelInput(item.models_draft)
+  ])
+  item.models_draft = ''
+}
+
+function handleCustomEndpointModelDraftKeydown(index: number, event: KeyboardEvent) {
+  if (event.isComposing) {
+    return
+  }
+
+  if (customEndpointModelSeparatorKeys.has(event.key)) {
+    event.preventDefault()
+    commitCustomEndpointModelDraft(index)
+    return
+  }
+
+  const item = form.custom_endpoint_models[index]
+  if (
+    event.key === 'Backspace' &&
+    item &&
+    !item.models_draft &&
+    item.models.length > 0
+  ) {
+    item.models = item.models.slice(0, -1)
+  }
+}
+
+function handleCustomEndpointModelPaste(index: number, event: ClipboardEvent) {
+  const text = event.clipboardData?.getData('text') || ''
+  if (!text.trim()) {
+    return
+  }
+
+  event.preventDefault()
+  const item = form.custom_endpoint_models[index]
+  if (!item) {
+    return
+  }
+
+  item.models = normalizeCustomEndpointModelNames([
+    ...item.models,
+    ...parseCustomEndpointModelInput(text)
+  ])
+  item.models_draft = ''
+}
+
+function prepareCustomEndpointModelsForSave(): CustomEndpointModelSetting[] {
+  const normalized: CustomEndpointModelSetting[] = []
+
+  for (const [index, item] of form.custom_endpoint_models.entries()) {
+    const id = item.id.trim()
+    const name = item.name.trim()
+    const platform = isCustomEndpointPlatform(item.platform) ? item.platform : ''
+    const baseURL = normalizeCustomEndpointBaseUrl(item.base_url)
+    const models = normalizeCustomEndpointModelNames([
+      ...item.models,
+      ...parseCustomEndpointModelInput(item.models_draft)
+    ])
+
+    const isEmpty =
+      !id &&
+      !name &&
+      !item.base_url.trim() &&
+      models.length === 0
+
+    if (isEmpty) {
+      continue
+    }
+
+    if (!platform) {
+      throw new Error(
+        t('admin.settings.customEndpointModels.invalidPlatform', { n: index + 1 })
+      )
+    }
+
+    if (!baseURL) {
+      throw new Error(t('admin.settings.customEndpointModels.invalidUrl', { n: index + 1 }))
+    }
+
+    if (models.length === 0) {
+      throw new Error(t('admin.settings.customEndpointModels.modelsRequired', { n: index + 1 }))
+    }
+
+    normalized.push({
+      id,
+      name,
+      platform,
+      base_url: baseURL,
+      models
+    })
+  }
+
+  return normalized
 }
 
 const defaultSubscriptionGroupOptions = computed<DefaultSubscriptionGroupOption[]>(() =>
@@ -2158,6 +2511,7 @@ async function loadSettings() {
   try {
     const settings = await adminAPI.settings.getSettings()
     Object.assign(form, settings)
+    form.custom_endpoint_models = toEditableCustomEndpointModels(settings.custom_endpoint_models)
     form.backend_mode_enabled = settings.backend_mode_enabled
     form.default_subscriptions = Array.isArray(settings.default_subscriptions)
       ? settings.default_subscriptions
@@ -2171,7 +2525,6 @@ async function loadSettings() {
       settings.registration_email_suffix_whitelist
     )
     registrationEmailSuffixWhitelistDraft.value = ''
-    customEndpointModelsDraft.value = stringifyCustomEndpointModels(settings.custom_endpoint_models)
     form.smtp_password = ''
     form.turnstile_secret_key = ''
     form.linuxdo_connect_client_secret = ''
@@ -2214,7 +2567,7 @@ function removeDefaultSubscription(index: number) {
 async function saveSettings() {
   saving.value = true
   try {
-    const customEndpointModels = parseCustomEndpointModelsDraft()
+    const customEndpointModels = prepareCustomEndpointModelsForSave()
     const normalizedDefaultSubscriptions = form.default_subscriptions
       .filter((item) => item.group_id > 0 && item.validity_days > 0)
       .map((item: DefaultSubscriptionSetting) => ({
@@ -2293,11 +2646,11 @@ async function saveSettings() {
     }
     const updated = await adminAPI.settings.updateSettings(payload)
     Object.assign(form, updated)
+    form.custom_endpoint_models = toEditableCustomEndpointModels(updated.custom_endpoint_models)
     registrationEmailSuffixWhitelistTags.value = normalizeRegistrationEmailSuffixDomains(
       updated.registration_email_suffix_whitelist
     )
     registrationEmailSuffixWhitelistDraft.value = ''
-    customEndpointModelsDraft.value = stringifyCustomEndpointModels(updated.custom_endpoint_models)
     form.smtp_password = ''
     form.turnstile_secret_key = ''
     form.linuxdo_connect_client_secret = ''
